@@ -1,0 +1,45 @@
+Notepad++ v6.9.1 enhancements and bug-fixes:
+
+#insert into deduction_payments_normal(deduction_name,ministry,department,month,year,amount,acct_num,bank,paypoint,sortcode)
+
+select deduction_logs.deduction_name AS deduction_name, deduction_logs.ministry AS ministry, parse_prefix(deduction_logs.department) AS department, deduction_logs.month AS month, deduction_logs.year AS year, sum(deduction_logs.amount - 150) AS amount, deduction_account ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ) AS acct_num, deduction_bank ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ) AS bank, deduction_bank_branch ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ) AS paypoint, bank_sc ( deduction_bank ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ), deduction_bank_branch ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name )) AS sortcode 
+from deduction_logs where month = 'April' and year = 2016 and concat( parse_prefix(deduction_logs.department), deduction_logs.month, deduction_logs.year ) in (select concat( parse_prefix(approval_tracks.department), approval_tracks.month, approval_tracks.year ) from approval_tracks where month = 'April' and year = 2016) and deduction_name not in (select deduction from deduction_names where allow_payment = 0)
+ and deduction_name = 'UNION DUES' 
+ group by parse_prefix(deduction_logs.department),deduction_logs.ministry,deduction_logs.month,deduction_logs.year,deduction_logs.deduction_name
+
+UNION ALL
+select deduction_logs.deduction_name AS deduction_name, deduction_logs.ministry AS ministry, parse_prefix(deduction_logs.department) AS department, deduction_logs.month AS month, deduction_logs.year AS year, sum(deduction_logs.amount - 100) AS amount, deduction_account ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ) AS acct_num, deduction_bank ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ) AS bank, deduction_bank_branch ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ) AS paypoint, bank_sc ( deduction_bank ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name ), deduction_bank_branch ( parse_prefix(deduction_logs.department), deduction_logs.deduction_name )) AS sortcode 
+from deduction_logs where month = 'April' and year = 2016 and concat( parse_prefix(deduction_logs.department), deduction_logs.month, deduction_logs.year ) in (select concat( parse_prefix(approval_tracks.department), approval_tracks.month, approval_tracks.year ) from approval_tracks where month = 'April' and year = 2016) and deduction_name not in (select deduction from deduction_names where allow_payment = 0)
+ and deduction_name = 'CREDIT DIRECT' 
+ group by parse_prefix(deduction_logs.department),deduction_logs.ministry,deduction_logs.month,deduction_logs.year,deduction_logs.deduction_name;
+
+
+
+
+
+
+#insert into isw_bulkitems(batch_name,month,year,beneficiary_name,beneficiary_code,amount,account_number,account_type,cbn_bank_code,payment_ref)
+
+
+
+select REPLACE(concat('DED',get_month_number(month),year,left(ministry,25)), ' ','') as batch_name,month,year, concat(deduction_name,' ',acct_num) as beneficiary_name, md5(concat(department,deduction_name)) as beneficiary_code, cast(sum(amount)*100 as unsigned) as amount, acct_num as account_number, 20 as account_type,getcbncode(bank) as cbn_bank_code,MD5(concat(ministry,department,month,year,deduction_name)) as payment_ref from deduction_payments_normal where month = 'April' and year = 2016 and status = 0 group by ministry,acct_num
+
+UNION ALL (
+select REPLACE(concat('DED',get_month_number(month),year,left(ministry,25)), ' ','') as batch_name,month,year, concat(deduction_name,'_PRSC_CHRGE') as beneficiary_name, md5(concat(ministry,deduction_name, 'PRSC_CHRGE')) as beneficiary_code, 150 * 100 * count(*) AS amount, '0056126373' as account_number, 20 as account_type, '063' as cbn_bank_code,MD5(concat(ministry,'PRSC_CHRGE',month,year,deduction_name)) as payment_ref  from deduction_logs where month = 'April' and year = 2016  and deduction_name = 'UNION DUES'  and deduction_name not in (select deduction from deduction_names where allow_payment = 0) group by deduction_logs.ministry,deduction_logs.month,deduction_logs.year,deduction_logs.deduction_name
+
+)
+
+UNION ALL (
+select REPLACE(concat('DED',get_month_number(month),year,left(ministry,25)), ' ','') as batch_name,month,year, concat(deduction_name,'_PRSC_CHRGE') as beneficiary_name, md5(concat(ministry,deduction_name, 'PRSC_CHRGE')) as beneficiary_code, 100 * 100 * count(*) AS amount, '0056128494' as account_number, 20 as account_type, '063' as cbn_bank_code,MD5(concat(ministry,'PRSC_CHRGE',month,year,deduction_name)) as payment_ref  from deduction_logs where month = 'April' and year = 2016 and deduction_name = 'CREDIT DIRECT' and deduction_name not in (select deduction from deduction_names where allow_payment = 0) group by deduction_logs.ministry,deduction_logs.month,deduction_logs.year,deduction_logs.deduction_name
+
+)
+;
+#update deduction_payments_normal set `status` = 1;
+
+
+
+#select  batch_name, beneficiary_name, sum(cast(amount/100  as decimal(50,2))) as Amount, year, month from isw_bulkitems where month = 'April' and year = 2016 and STATUS = 1 and beneficiary_name = 'UNION DUES_PRSC_CHRGE' order by batch_name;
+
+select deduction_name, count(*) as TotalNumber,count(*)*150 as UNIONTotalTechVibeCharge, count(*) * 50 as 'N50Commission' from deduction_logs where month = 'April' and year = 2016 and deduction_name ='UNION DUES';
+
+select deduction_name, count(*) as TotalNumber,count(*)*100 as CDTotalTechVibeCharge from deduction_logs where month = 'April' and year = 2016 and deduction_name ='CREDIT DIRECT';
